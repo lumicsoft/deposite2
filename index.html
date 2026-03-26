@@ -14,6 +14,7 @@
         .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(234, 179, 8, 0.1); }
         .gold-btn { background: linear-gradient(to right, #ca8a04, #a16207); transition: all 0.3s; }
         .gold-btn:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(202, 138, 4, 0.3); }
+        input::placeholder { color: #475569; }
     </style>
 </head>
 <body class="p-4 md:p-10">
@@ -32,7 +33,7 @@
             <div class="space-y-6">
                 <div class="glass p-8 rounded-[2rem]">
                     <h3 class="orbitron text-sm font-bold text-yellow-500 mb-4 uppercase tracking-widest">1. Merchant Setup</h3>
-                    <p class="text-xs text-gray-400 mb-6">Register once to generate your permanent, unique USDT deposit address. No customer approval required.</p>
+                    <p class="text-xs text-gray-400 mb-6">Register once to generate your permanent, unique USDT deposit address.</p>
                     <button id="regBtn" onclick="register()" class="w-full bg-white/5 border border-yellow-500/20 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-yellow-500/10 transition-all">Register as Merchant</button>
                     
                     <div id="proxyContainer" class="mt-8 p-4 bg-black/40 rounded-2xl border border-white/5 hidden">
@@ -41,29 +42,35 @@
                     </div>
                 </div>
 
+                <div id="verifySection" class="glass p-8 rounded-[2rem] border border-white/5 hidden">
+                    <h3 class="orbitron text-sm font-bold text-yellow-500 mb-4 uppercase tracking-widest">2. Verify Transaction</h3>
+                    <p class="text-[10px] text-gray-400 mb-4 font-bold">Payment भेजने के बाद Transaction Hash यहाँ डालें:</p>
+                    <input type="text" id="txHashInput" placeholder="0x..." class="w-full bg-black/40 border border-white/10 p-4 rounded-xl text-xs font-mono mb-4 outline-none focus:border-yellow-500">
+                    <button onclick="verifyTransaction()" class="w-full bg-yellow-600/20 text-yellow-500 border border-yellow-500/40 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-yellow-500 hover:text-black transition-all">Verify & Confirm</button>
+                </div>
+
                 <div id="balanceCard" class="glass p-8 rounded-[2rem] border-l-4 border-yellow-500 hidden">
-                    <p class="text-[10px] uppercase font-black text-gray-500">Proxy Balance (In-Contract)</p>
+                    <p class="text-[10px] uppercase font-black text-gray-500">In-Contract Balance</p>
                     <h2 class="orbitron text-4xl font-black mt-2" id="proxyBal">0.00 <span class="text-sm text-yellow-600">USDT</span></h2>
                     <div class="flex gap-3 mt-8">
                         <button onclick="fetchBalance()" class="flex-1 bg-white/5 py-4 rounded-xl text-[10px] font-bold uppercase hover:bg-white/10">Sync</button>
-                        <button onclick="withdraw()" class="flex-[2] bg-white text-black py-4 rounded-xl text-[10px] font-black uppercase hover:bg-gray-200 shadow-xl">Withdraw to Main Wallet</button>
+                        <button onclick="withdraw()" class="flex-[2] bg-white text-black py-4 rounded-xl text-[10px] font-black uppercase hover:bg-gray-200">Withdraw All</button>
                     </div>
                 </div>
             </div>
 
             <div class="glass p-10 rounded-[2.5rem] flex flex-col items-center justify-center text-center">
-                <h3 class="orbitron text-sm font-bold text-yellow-500 mb-8 uppercase tracking-widest">Customer Payment (QR)</h3>
+                <h3 class="orbitron text-sm font-bold text-yellow-500 mb-8 uppercase tracking-widest text-center w-full">Scan & Pay</h3>
                 
                 <div class="bg-white p-4 rounded-[2rem] shadow-[0_0_50px_rgba(202,138,4,0.1)] mb-6">
                     <canvas id="qrCanvas"></canvas>
                 </div>
                 
                 <div class="space-y-2">
-                    <p class="text-[11px] text-gray-400 font-medium">Customer can send USDT directly from any Exchange</p>
-                    <p class="text-[10px] text-yellow-600 font-bold tracking-tighter uppercase">No Approval • No Gas for Customer • Instant Tracking</p>
+                    <p class="text-[11px] text-gray-400 font-medium italic">Send USDT (BEP20) to the address above</p>
                 </div>
 
-                <div id="statusLog" class="mt-10 w-full text-[10px] font-mono text-gray-500 bg-black/20 p-4 rounded-xl text-left h-24 overflow-y-auto">
+                <div id="statusLog" class="mt-10 w-full text-[10px] font-mono text-gray-500 bg-black/20 p-4 rounded-xl text-left h-32 overflow-y-auto">
                     > System ready. Waiting for connection...
                 </div>
             </div>
@@ -72,9 +79,8 @@
     </div>
 
     <script>
-        // --- CONFIGURATION (UPDATE THESE) ---
-        const FACTORY_ADDR = "0xb45bf2d2a4b05226c44149248f4e8fef6aac0a8f"; // Your Factory Address
-        const USDT_ADDR = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; // BSC Testnet USDT
+        const FACTORY_ADDR = "0xb45bf2d2a4b05226c44149248f4e8fef6aac0a8f"; 
+        const USDT_ADDR = "0x3B66b1E08F55AF26c8eA14a73dA64b6bC8D799dE"; 
 
         const FACTORY_ABI = [
             "function registerMerchant() external returns (address)",
@@ -116,18 +122,18 @@
                 userProxy = proxy;
                 document.getElementById('proxyContainer').classList.remove('hidden');
                 document.getElementById('balanceCard').classList.remove('hidden');
+                document.getElementById('verifySection').classList.remove('hidden'); // Show Verify Section
                 document.getElementById('proxyAddr').innerText = proxy;
                 document.getElementById('regBtn').innerText = "Account Active";
                 document.getElementById('regBtn').disabled = true;
                 
-                // Generate QR
                 new QRious({
                     element: document.getElementById('qrCanvas'),
                     size: 220,
                     value: proxy
                 });
                 
-                log(`Proxy detected: ${proxy}`);
+                log(`Proxy Address: ${proxy}`);
                 fetchBalance();
             } else {
                 log("No merchant account found. Please Register.");
@@ -154,14 +160,54 @@
             } catch (e) { log("Balance check failed", true); }
         }
 
+        // --- NEW: TRANSACTION VERIFICATION LOGIC ---
+        async function verifyTransaction() {
+            const txHash = document.getElementById('txHashInput').value.trim();
+            if(!txHash || txHash.length < 60) return log("Invalid Hash", true);
+
+            log(`Checking Blockchain for Hash: ${txHash.slice(0,10)}...`);
+
+            try {
+                const receipt = await provider.getTransactionReceipt(txHash);
+                if (!receipt) return log("Transaction not found. Wait 10-20 seconds.", true);
+
+                if (receipt.status !== 1) return log("Transaction Failed on blockchain", true);
+
+                // USDT Transfer Event Topic: Transfer(address,address,uint256)
+                const transferTopic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+                
+                const usdtLog = receipt.logs.find(l => 
+                    l.address.toLowerCase() === USDT_ADDR.toLowerCase() && 
+                    l.topics[0] === transferTopic
+                );
+
+                if (!usdtLog) return log("Not a USDT Transaction!", true);
+
+                // Decode logs to find receiver
+                const receiver = ethers.utils.defaultAbiCoder.decode(['address'], usdtLog.topics[2])[0];
+                const amount = ethers.utils.defaultAbiCoder.decode(['uint256'], usdtLog.data)[0];
+
+                if (receiver.toLowerCase() === userProxy.toLowerCase()) {
+                    log(`SUCCESS: Detected ${ethers.utils.formatUnits(amount, 18)} USDT!`, false);
+                    log(`Callback: Payment verified for Proxy ${userProxy}`);
+                    fetchBalance();
+                    // यहाँ आप अपनी API कॉल कर सकते हैं: updateDatabase(txHash, amount);
+                } else {
+                    log("Hash verified, but payment sent to WRONG address!", true);
+                }
+            } catch (e) {
+                log("Verification Error: " + e.message, true);
+            }
+        }
+
         async function withdraw() {
             if(!userProxy) return;
             try {
                 const proxyContract = new ethers.Contract(userProxy, PROXY_ABI, signer);
-                log("Initiating withdrawal to main wallet...");
+                log("Initiating withdrawal...");
                 const tx = await proxyContract.withdrawAll();
                 await tx.wait();
-                log("Withdrawal Success! Check your wallet.", false);
+                log("Withdrawal Success!", false);
                 fetchBalance();
             } catch (e) { log(e.reason || "Withdrawal failed", true); }
         }
